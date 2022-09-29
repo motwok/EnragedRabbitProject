@@ -223,6 +223,7 @@ class Ercf:
 
     cmd_ERCF_HOME_EXTRUDER_help = "Home the filament tip on the toolhead sensor"
     def cmd_ERCF_HOME_EXTRUDER(self, gcmd):
+        self.gcode.respond_info("COMMAND: ERCF_HOME_EXTRUDER")
         homing_length = gcmd.get_float('TOTAL_LENGTH', 100., above=0.)
         step_length = gcmd.get_float('STEP_LENGTH', 1., above=0.)
         both_in_sync = True
@@ -238,8 +239,10 @@ class Ercf:
                 if step * abs(step_length) >= homing_length :
                     self.gcode.respond_info(
                                     "Unable to reach the toolhead sensor")
+                    self.gcode.respond_info("state " + bool(sensor.runout_helper.filament_present))
                     self.gcode.run_script_from_command(self.MACRO_UNSELECT_TOOL)
                     self.gcode.run_script_from_command(self.MACRO_PAUSE)
+                    self.gcode.respond_info("state " + bool(sensor.runout_helper.filament_present))
                     break
                 if both_in_sync :
                     self.gear_stepper.do_set_position(0.)
@@ -266,6 +269,7 @@ class Ercf:
 
     cmd_ERCF_LOAD_help = "Load filament from ERCF to the toolhead"
     def cmd_ERCF_LOAD(self, gcmd):
+        self.gcode.respond_info("Command: ERCF_LOAD.")
         req_length = gcmd.get_float('LENGTH', 0.)
         num_moves = gcmd.get_int('MOVES', 1)
         iterate = False if req_length == 0. else True
@@ -308,6 +312,8 @@ class Ercf:
             if diff_distance <= 6. or not iterate :
                 # Measured move is close enough or no iterations : load succeeds
                 return
+            else:
+                self.gcode.respond_info("Measured move is > 6, need to do 1-2 correction moves.")
 
             # Do the correction moves
             for retry_attempts in range(2):
@@ -319,9 +325,15 @@ class Ercf:
                 diff_distance = req_length - counter_distance
                 if diff_distance <= 6.:
                     # Measured move is close enough : load succeeds
+                    self.gcode.respond_info("Correction succeeds.")
                     return
+                else:
+                    self.gcode.respond_info("Correction delta still greater than 6, retrying.")
+
                 if diff_distance > self.LONG_MOVE_THRESHOLD:
+                    self.gcode.respond_info("Now past the LONG_MOVE_THRESHOLD, going to failure.")
                     break
+                    
             # Load failed
             self.gcode.respond_info(
 				"Too much slippage detected during the load,"
@@ -332,6 +344,7 @@ class Ercf:
 
     cmd_ERCF_UNLOAD_help = "Unload filament and park it in the ERCF"
     def cmd_ERCF_UNLOAD(self, gcmd):
+        self.gcode.respond_info("COMMAND: ERCF_UNLOAD")
         # Define unload move parameters
         self.toolhead.dwell(0.2)
         iterate = True
@@ -514,6 +527,7 @@ class Ercf:
 
     cmd_ERCF_FINALIZE_LOAD_help = "Finalize the load of a tool to the nozzle"
     def cmd_ERCF_FINALIZE_LOAD(self, gcmd):
+        self.gcode.respond_info("Command: ERCF_FIANLIZE_LOAD.")
         length = gcmd.get_float('LENGTH', 30.0, above=0.)
         tune = gcmd.get_int('TUNE', 0)
         threshold = gcmd.get_float('THRESHOLD', 10.0, above=0.)
